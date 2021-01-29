@@ -21,11 +21,14 @@ class ChatSocketHandler(tornado.websocket.WebSocketHandler):
     session_id: str = ""
 
     def open(self):
+        self.session_id = str(uuid.uuid4())
         ChatSocketHandler.waiters.add(self)
+        
 
     def on_close(self):
-        leaving_chat = {"id": self.session_id, "x": -1, "y": -1, "name": ""}
-        ChatSocketHandler.send_updates(leaving_chat)
+        session_id = self.session_id
+        leaving_chat = {"id": session_id, "x": -1, "y": -1, "name": ""}
+        ChatSocketHandler.send_updates(leaving_chat, session_id)
 
         ChatSocketHandler.waiters.remove(self)
 
@@ -36,14 +39,10 @@ class ChatSocketHandler(tornado.websocket.WebSocketHandler):
         if len(chat) == 0:
             return
 
-        self.session_id = chat["id"]
-        ChatSocketHandler.send_updates(chat)
+        ChatSocketHandler.send_updates(chat, self.session_id)
 
 
     def _parse_message(self, message: Dict) -> Dict:
-            id = message.get("id")
-            if not id:
-                return {}
 
             x = message.get("x")
             y = message.get("y")
@@ -56,12 +55,19 @@ class ChatSocketHandler(tornado.websocket.WebSocketHandler):
             if not name:
                 name = "Guest"
 
-            return {"id": id, "x": x, "y": y, "name": name}
+            return {"id": self.session_id, "x": x, "y": y, "name": name}
 
     @classmethod
-    def send_updates(cls, chat: Dict):
-        logging.info("sending message to %d waiters", len(cls.waiters))
+    def send_updates(cls, chat: Dict, sender_session_id: str):
+        """sends chat message to all except the sender (denoted by sender_session_id)
+
+        Args:
+            chat   : Oncoming message in the form of a Dict
+            param2 : sender_session_id
+        """
         for waiter in cls.waiters:
+            if waiter.session_id == sender_session_id:
+                continue # dont send the sender
             try:
                 waiter.write_message(chat)
             except:
@@ -80,16 +86,12 @@ def make_app() -> tornado.web.Application:
         (r"/static/js/(.*)", tornado.web.StaticFileHandler, {"path": js_path}),
         (r"/static/css/(.*)", tornado.web.StaticFileHandler, {"path": css_path}),
         (r"/(.*)", tornado.web.StaticFileHandler, {"path": build_path, "default_filename": "index.html"})
-        # (r"/static/lib/(.*)", tornado.web.StaticFileHandler, {"path": node_modules}),
 
     ])
-    # app.settings["static_path"] = path
     return app
 
 if __name__ == "__main__":
-    logging.info(f'Starting app at port {PORT}')
+    logging.info(f'Starting app at http://localhost:{PORT}')
     app = make_app()
-
-    
     app.listen(PORT)
     tornado.ioloop.IOLoop.current().start()

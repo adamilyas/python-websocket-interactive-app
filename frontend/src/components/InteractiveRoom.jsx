@@ -7,7 +7,6 @@ export default class InteractiveRoom extends React.Component {
     constructor(props){
       super(props);
       this.state = {
-        id: '',
         displayName: props.location.displayName,
         ws: null,
         x: 0, 
@@ -19,7 +18,7 @@ export default class InteractiveRoom extends React.Component {
     // const [usersMap, setUsersMap] = useState(new Map());
 
     componentDidMount(){
-      this.setState({id: uuidv4(), displayName: this.state.displayName})
+      this.setState({displayName: this.state.displayName})
       this.connect();
     }
   
@@ -50,19 +49,17 @@ export default class InteractiveRoom extends React.Component {
           // oncoming
           let data = JSON.parse(e.data)
 
-          if (data.id != null && data.id !== this.state.id) {
-            let usersMap = this.state.usersMap
-          
-            if (data.x === -1 && data.y === -1){
-              // leave the room
-              usersMap.delete(data.id)
-            } else {
-              usersMap.set(data.id, data)
-            }
+          let usersMap = this.state.usersMap
+        
+          if (data.x === -1 && data.y === -1){
+            // leave the room
+            usersMap.delete(data.id)
+          } else {
+            usersMap.set(data.id, data)
+          }
 
-            this.setState(usersMap)
+          this.setState(usersMap)
 
-          } // else dont do anything
         }
 
         // websocket onerror event listener
